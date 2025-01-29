@@ -1,57 +1,78 @@
----
 name: Build and Push Java Image to Google Cloud Platform
+
 on:
   push:
     branches: [ main ]
+
 jobs:
   build-push-gcr:
     name: Build and Push to GCP
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # The runner will use an Ubuntu environment
     env:
-      IMAGE_NAME: test-deploy-cicd-gke
-      PROJECT_ID: ti-ds-tii-01
+      IMAGE_NAME: test-deploy-cicd-gke  # Image name for Docker
+      PROJECT_ID: ti-ds-tii-01  # GCP Project ID
+
     steps:
+    # Step 1: Checkout the code from the repository
     - name: Checkout
       uses: actions/checkout@v2
 
+    # Step 2: Set up Google Cloud SDK and authenticate using service account
     - uses: google-github-actions/setup-gcloud@v2
       with:
         version: 'latest'
-        service_account_key: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-        project_id: ${{ env.PROJECT_ID }}
-        export_default_credentials: true
+        service_account_key: ${{ secrets.SERVICE_ACCOUNT_KEY }}  # Service Account Key stored as secret
+        project_id: ${{ env.PROJECT_ID }}  # Set GCP project
+        export_default_credentials: true  # Export credentials for gcloud
+
+    # Step 3: Build the Java project with Maven
     - name: Build with Maven
-      run: mvn clean package
+      run: mvn clean package  # Build the Java project
+
+    # Step 4: List files in the target directory to verify the .jar file is built
     - name: List files in target directory
       run: ls -l target/
+
+    # Step 5: Build Docker image from Dockerfile
     - name: Build Docker Image
-      run: docker build -t $IMAGE_NAME:latest .
+      run: docker build -t $IMAGE_NAME:latest .  # Build the image using the Dockerfile
+
+    # Step 6: List contents of scripts directory (this is just for debugging, can be omitted)
     - name: List contents of scripts directory
       run: ls -l scripts/
+
+    # Step 7: Automatic version tagging (e.g., incrementing version)
     - name: Automatic Tagging of Releases
       id: increment-git-tag
       run: |
-        bash scripts/git_update.sh -v major
+        # Ensure the latest commit is pulled before attempting to tag it
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git fetch --tags
+        bash scripts/git_update.sh -v major  # Automatically update the version using your script
 
+    # Step 8: Configure Docker authentication with Google Cloud
     - name: Configure Docker Client
       run: |-
-        gcloud auth configure-docker --quiet
-        gcloud auth configure-docker us-west2-docker.pkg.dev --quiet
+        gcloud auth configure-docker --quiet  # Authenticate Docker with GCP
+        gcloud auth configure-docker us-west2-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
 
+    # Step 9: Push the Docker image to Google Container Registry (GCR)
     - name: Push Docker Image to Container Registry (GCR)
       env:
-        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}
+        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the tag from the previous step
       run: |-
-        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
-        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
-        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
-        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
+        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Tag image for GCR
+        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
+        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push latest image to GCR
+        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push versioned image to GCR
 
+    # Step 10: Push the Docker image to Artifact Registry
     - name: Push Docker Image to Artifact Registry
       env:
-        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}
+        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the tag from the previous step
       run: |-
-        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
-        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
-        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
-        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
+        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest  # Tag image for Artifact Registry
+        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
+        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest  # Push latest image to Artifact Registry
+        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG  # Push versioned image to Artifact Registry
