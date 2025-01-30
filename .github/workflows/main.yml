@@ -39,7 +39,7 @@ jobs:
     - name: Build Docker Image
       run: docker build -t $IMAGE_NAME:latest .  # Build the image using the Dockerfile
 
-    # Step 6: Automatic version tagging (incrementing the version)
+    # Step 6: Automatic version tagging (using current date-time)
     - name: Automatic Tagging of Releases
       id: increment-git-tag
       run: |
@@ -47,25 +47,23 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git fetch --tags
-        # Example of automatic versioning, you can modify it based on your logic
-        git tag v$(date +'%Y%m%d%H%M%S')  # Use current date-time for versioning
+        # Use current date-time for versioning
+        git tag v$(date +'%Y%m%d%H%M%S')  # Example of automatic versioning
         git push --tags
-        echo "::set-output name=git-tag::$(git describe --tags --abbrev=0)"
+        echo "git-tag=v$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
 
     # Step 7: Configure Docker authentication for GCP (GCR & Artifact Registry)
     - name: Configure Docker Client for GCP
       run: |
-        gcloud auth configure-docker us.gcr.io --quiet  # Authenticate Docker with GCR
         gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
 
     # Step 8: Push the Docker image to Artifact Registry
     - name: Push Docker Image to Artifact Registry
-      env:
-        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
       run: |-
+        # Get the Git tag from the environment
+        GIT_TAG=${{ env.git-tag }}
         # Tag image for Artifact Registry (using both latest and Git tag)
         docker tag $IMAGE_NAME:latest $REGISTRY/$PROJECT_ID/$REPOSITORY:$GIT_TAG
         docker push $REGISTRY/$PROJECT_ID/$REPOSITORY:$GIT_TAG
         docker tag $IMAGE_NAME:latest $REGISTRY/$PROJECT_ID/$REPOSITORY:latest
         docker push $REGISTRY/$PROJECT_ID/$REPOSITORY:latest
-
