@@ -11,6 +11,8 @@ jobs:
     env:
       IMAGE_NAME: test-deploy-cicd-gke  # Docker image name
       PROJECT_ID: deployment-k8s-gke-demo  # GCP project ID
+      REGISTRY: us-east1-docker.pkg.dev  # Artifact Registry location
+      REPOSITORY: images  # Artifact Registry repository name
 
     steps:
     # Step 1: Checkout the code from the repository
@@ -45,7 +47,10 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git fetch --tags
-        bash scripts/git_update.sh -v major  # Automatically update the version using the script
+        # Example of automatic versioning, you can modify it based on your logic
+        git tag v$(date +'%Y%m%d%H%M%S')  # Use current date-time for versioning
+        git push --tags
+        echo "::set-output name=git-tag::$(git describe --tags --abbrev=0)"
 
     # Step 7: Configure Docker authentication for GCP (GCR & Artifact Registry)
     - name: Configure Docker Client for GCP
@@ -53,22 +58,14 @@ jobs:
         gcloud auth configure-docker us.gcr.io --quiet  # Authenticate Docker with GCR
         gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
 
-    # Step 8: Push the Docker image to Google Container Registry (GCR)
-    - name: Push Docker Image to Google Container Registry (GCR)
-      env:
-        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
-      run: |-
-        #docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Tag image for GCR
-        #docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
-        #docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push the latest image to GCR
-        #docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push the versioned image to GCR
-
-    # Step 9: Push the Docker image to Artifact Registry (if needed)
+    # Step 8: Push the Docker image to Artifact Registry
     - name: Push Docker Image to Artifact Registry
       env:
         GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
       run: |-
-        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
-        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
-        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
-        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
+        # Tag image for Artifact Registry (using both latest and Git tag)
+        docker tag $IMAGE_NAME:latest $REGISTRY/$PROJECT_ID/$REPOSITORY:$GIT_TAG
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY:$GIT_TAG
+        docker tag $IMAGE_NAME:latest $REGISTRY/$PROJECT_ID/$REPOSITORY:latest
+        docker push $REGISTRY/$PROJECT_ID/$REPOSITORY:latest
+
