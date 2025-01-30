@@ -51,6 +51,17 @@ jobs:
         git fetch --tags
         bash scripts/git_update.sh -v major  # Automatically update the version using the script
 
+    - name: Authenticate with Google Cloud
+      run: |
+        if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
+          echo "Error: SERVICE_ACCOUNT_KEY is empty!" && exit 1
+        fi
+        echo "$SERVICE_ACCOUNT_KEY" > /tmp/keyfile.json
+        cat /tmp/keyfile.json  # Debug the key content to ensure it's correctly written
+        gcloud auth activate-service-account --key-file=/tmp/keyfile.json
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+
     # Step 8: Configure Docker authentication with Google Cloud
     - name: Configure Docker Client for GCP
       run: |-
