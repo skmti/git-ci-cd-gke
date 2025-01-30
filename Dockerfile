@@ -8,7 +8,7 @@ WORKDIR /app
 COPY target/test-deploy-cicd-gke-0.0.1-SNAPSHOT.jar /app/test-deploy-cicd-gke-0.0.1-SNAPSHOT.jar
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "/app/test-deploy-cicd-gke-0.0.1-snapshot.jar"]
+ENTRYPOINT ["java", "-jar", "/app/test-deploy-cicd-gke-0.0.1-SNAPSHOT.jar"]
 
 # Expose port 8080
 EXPOSE 8080
