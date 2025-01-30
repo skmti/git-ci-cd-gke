@@ -1,51 +1,74 @@
-name: Build and Push Docker Image to Google Cloud
+name: Build, Tag, and Push Java Docker Image to Google Cloud Platform
 
 on:
   push:
-    branches:
-      - main  # Trigger the workflow on push to the main branch (or any branch you prefer)
+    branches: [ main ]  # Trigger on push to the main branch
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    
+  build-push-gcr:
+    name: Build, Tag, and Push Java Docker Image to GCP
+    runs-on: ubuntu-latest  # The runner will use an Ubuntu environment
+    env:
+      IMAGE_NAME: test-deploy-cicd-gke  # Docker image name
+      PROJECT_ID: deployment-k8s-gke-demo  # GCP project ID
+
     steps:
-    # Checkout the code
-    - name: Checkout code
+    # Step 1: Checkout the code from the repository
+    - name: Checkout Code
       uses: actions/checkout@v2
 
-    # Set up Java (with distribution set to temurin)
-    - name: Set up JDK 17
-      uses: actions/setup-java@v2
+    # Step 2: Set up Google Cloud SDK and authenticate using the service account key
+    - uses: google-github-actions/setup-gcloud@v2
       with:
-        java-version: '17'
-        distribution: 'temurin'  # Use temurin instead of adoptopenjdk
+        version: 'latest'
+        service_account_key: ${{ secrets.SERVICE_ACCOUNT_KEY }}  # Service Account Key stored as a secret
+        project_id: ${{ env.PROJECT_ID }}  # Set GCP project
+        export_default_credentials: true  # Export credentials for gcloud
 
-    # Build the JAR using Maven (adjust the command if you're using Gradle)
-    - name: Build JAR with Maven
-      run: mvn clean package -DskipTests
+    # Step 3: Build the Java project using Maven
+    - name: Build Java Project with Maven
+      run: mvn clean package  # Build the Java project with Maven
 
-    # Set up Docker Buildx
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+    # Step 4: List files in the target directory to verify the .jar file is built
+    - name: List Files in Target Directory
+      run: ls -l target/
 
-    # Log in to Google Cloud
-    - name: Set up GCP credentials
-      uses: google-github-actions/auth@v0
-      with:
-        credentials_json: ${{ secrets.GCP_KEY }}
+    # Step 5: Build Docker image from Dockerfile
+    - name: Build Docker Image
+      run: docker build -t $IMAGE_NAME:latest .  # Build the image using the Dockerfile
 
-    # Configure Docker to use Google Cloud
-    - name: Configure Docker to use Google Cloud
+    # Step 6: Automatic version tagging (incrementing the version)
+    - name: Automatic Tagging of Releases
+      id: increment-git-tag
       run: |
-        gcloud auth configure-docker gcr.io
+        # Ensure the latest commit is pulled before attempting to tag it
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git fetch --tags
+        bash scripts/git_update.sh -v major  # Automatically update the version using the script
 
-    # Build the Docker image
-    - name: Build Docker image
+    # Step 7: Configure Docker authentication for GCP (GCR & Artifact Registry)
+    - name: Configure Docker Client for GCP
       run: |
-        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-app:${{ github.sha }} .
+        gcloud auth configure-docker us.gcr.io --quiet  # Authenticate Docker with GCR
+        gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
 
-    # Push the Docker image to GCR
-    - name: Push Docker image to GCR
-      run: |
-        docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/your-app:${{ github.sha }}
+    # Step 8: Push the Docker image to Google Container Registry (GCR)
+    - name: Push Docker Image to Google Container Registry (GCR)
+      env:
+        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
+      run: |-
+        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Tag image for GCR
+        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
+        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push the latest image to GCR
+        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push the versioned image to GCR
+
+    # Step 9: Push the Docker image to Artifact Registry (if needed)
+    - name: Push Docker Image to Artifact Registry
+      env:
+        GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
+      run: |-
+        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
+        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
+        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
+        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
