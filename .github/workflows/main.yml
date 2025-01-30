@@ -2,15 +2,15 @@ name: Build, Tag, and Push Java Docker Image to Google Cloud Platform
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]  # Trigger on push to the main branch
 
 jobs:
   build-push-gcr:
     name: Build, Tag, and Push Java Docker Image to GCP
     runs-on: ubuntu-latest  # The runner will use an Ubuntu environment
     env:
-      IMAGE_NAME: test-deploy-cicd-gke  # Image name for Docker
-      PROJECT_ID: deployment-k8s-gke-demo  # GCP Project ID
+      IMAGE_NAME: test-deploy-cicd-gke  # Docker image name
+      PROJECT_ID: deployment-k8s-gke-demo  # GCP project ID
 
     steps:
     # Step 1: Checkout the code from the repository
@@ -46,12 +46,12 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git fetch --tags
         bash scripts/git_update.sh -v major  # Automatically update the version using the script
-        
-    # Step 7: Configure Docker authentication with Google Cloud
+
+    # Step 7: Configure Docker authentication for GCP (GCR & Artifact Registry)
     - name: Configure Docker Client for GCP
-      run: |-
+      run: |
         gcloud auth configure-docker us.gcr.io --quiet  # Authenticate Docker with GCR
-        gcloud auth configure-docker us-east1-docker.pkg.dev  # Authenticate Docker with Artifact Registry
+        gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
 
     # Step 8: Push the Docker image to Google Container Registry (GCR)
     - name: Push Docker Image to Google Container Registry (GCR)
@@ -68,8 +68,7 @@ jobs:
       env:
         GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
       run: |-
-        # Only push to Artifact Registry if required
-        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
-        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
-        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
-        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
+        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
+        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:latest
+        docker tag $IMAGE_NAME:latest us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
+        docker push us-east1-docker.pkg.dev/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG
