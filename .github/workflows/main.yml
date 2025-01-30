@@ -17,6 +17,7 @@ jobs:
       uses: actions/setup-java@v3
       with:
         java-version: '17'
+        distribution: 'zulu'  # Specify distribution (e.g., zulu or adoptopenjdk)
 
     - name: Cache Maven dependencies
       uses: actions/cache@v3
