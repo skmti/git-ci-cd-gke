@@ -58,10 +58,10 @@ jobs:
       env:
         GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
       run: |-
-        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Tag image for GCR
-        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
-        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push the latest image to GCR
-        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push the versioned image to GCR
+        #docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Tag image for GCR
+        #docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Tag image with version tag
+        #docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push the latest image to GCR
+        #docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push the versioned image to GCR
 
     # Step 9: Push the Docker image to Artifact Registry (if needed)
     - name: Push Docker Image to Artifact Registry
