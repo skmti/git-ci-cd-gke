@@ -37,11 +37,7 @@ jobs:
     - name: Build Docker Image
       run: docker build -t $IMAGE_NAME:latest .  # Build the image using the Dockerfile
 
-    # Step 6: List contents of scripts directory (debugging step, can be omitted)
-    - name: List Contents of Scripts Directory
-      run: ls -l scripts/
-
-    # Step 7: Automatic version tagging (incrementing the version)
+    # Step 6: Automatic version tagging (incrementing the version)
     - name: Automatic Tagging of Releases
       id: increment-git-tag
       run: |
@@ -51,32 +47,13 @@ jobs:
         git fetch --tags
         bash scripts/git_update.sh -v major  # Automatically update the version using the script
         
-    - name: Verify Service Account Key
-      run: |
-        echo "SERVICE_ACCOUNT_KEY starts with: $(echo "$SERVICE_ACCOUNT_KEY" | head -n 1)"
-        echo "SERVICE_ACCOUNT_KEY ends with: $(echo "$SERVICE_ACCOUNT_KEY" | tail -n 1)"
-      env:
-        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}        
-        
-
-    - name: Authenticate with Google Cloud
-      run: |
-        if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
-          echo "Error: SERVICE_ACCOUNT_KEY is empty!" && exit 1
-        fi
-        echo "$SERVICE_ACCOUNT_KEY" > /tmp/keyfile.json
-        cat /tmp/keyfile.json  # Debug the key content to ensure it's correctly written
-        gcloud auth activate-service-account --key-file=/tmp/keyfile.json
-      env:
-        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-
-    # Step 8: Configure Docker authentication with Google Cloud
+    # Step 7: Configure Docker authentication with Google Cloud
     - name: Configure Docker Client for GCP
       run: |-
         gcloud auth configure-docker us.gcr.io --quiet  # Authenticate Docker with GCR
-        gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
+        gcloud auth configure-docker us-east1-docker.pkg.dev  # Authenticate Docker with Artifact Registry
 
-    # Step 9: Push the Docker image to Google Container Registry (GCR)
+    # Step 8: Push the Docker image to Google Container Registry (GCR)
     - name: Push Docker Image to Google Container Registry (GCR)
       env:
         GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
@@ -86,12 +63,13 @@ jobs:
         docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest  # Push the latest image to GCR
         docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:$GIT_TAG  # Push the versioned image to GCR
 
-    # Step 10: Push the Docker image to Artifact Registry
+    # Step 9: Push the Docker image to Artifact Registry (if needed)
     - name: Push Docker Image to Artifact Registry
       env:
         GIT_TAG: ${{ steps.increment-git-tag.outputs.git-tag }}  # Get the git tag from the previous step
       run: |-
-        docker tag $IMAGE_NAME:latest gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
-        docker push gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
+        # Only push to Artifact Registry if required
         docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
         docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:latest
+        docker tag $IMAGE_NAME:latest us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
+        docker push us-west2-docker.pkg.dev/$PROJECT_ID/images/$IMAGE_NAME:$GIT_TAG
