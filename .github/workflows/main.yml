@@ -55,7 +55,7 @@ jobs:
     - name: Configure Docker Client
       run: |-
         gcloud auth configure-docker --quiet  # Authenticate Docker with GCP
-        gcloud auth configure-docker us-west2-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry
+        gcloud auth configure-docker us-east1-docker.pkg.dev --quiet  # Authenticate Docker with Artifact Registry 
 
     # Step 9: Push the Docker image to Google Container Registry (GCR)
     - name: Push Docker Image to Container Registry (GCR)
