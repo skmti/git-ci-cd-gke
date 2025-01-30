@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest  # The runner will use an Ubuntu environment
     env:
       IMAGE_NAME: test-deploy-cicd-gke  # Image name for Docker
-      PROJECT_ID: ti-ds-tii-01  # GCP Project ID
+      PROJECT_ID: deployment-k8s-gke-demo  # GCP Project ID
 
     steps:
     # Step 1: Checkout the code from the repository
