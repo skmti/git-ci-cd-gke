@@ -50,6 +50,14 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git fetch --tags
         bash scripts/git_update.sh -v major  # Automatically update the version using the script
+        
+    - name: Verify Service Account Key
+      run: |
+        echo "SERVICE_ACCOUNT_KEY starts with: $(echo "$SERVICE_ACCOUNT_KEY" | head -n 1)"
+        echo "SERVICE_ACCOUNT_KEY ends with: $(echo "$SERVICE_ACCOUNT_KEY" | tail -n 1)"
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}        
+        
 
     - name: Authenticate with Google Cloud
       run: |
